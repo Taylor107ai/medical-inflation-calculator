@@ -918,10 +918,10 @@ const MEDICAL_PLANS = {
     id: 'manulife_supreme_lite',
     productName: '宏利晉逸自願醫保附加保障',
     productShortName: '宏利晉逸',
-    sourceLabel: '宏利晉逸 (Supreme Lite Supplementary, HKD)',
+    sourceLabel: '宏利晉逸附加保障 (Supreme Lite Supplementary)',
     effectiveDate: '2025-12-29',
     sourceFile: '宏利晉逸自願醫保附加保障 - 保費率表 (2026年1月生效).pdf',
-    note: '保費表生效日 2025-12-29 ・ 男女保費相同 ・ 只取 HKD',
+    note: '保費表生效日 2025-12-29 ・ 男女保費相同',
     variants: [
       {
         id: 'smart_0',
