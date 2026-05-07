@@ -333,6 +333,31 @@
     color: var(--text-light);
     margin-bottom: 6px;
   }
+
+  /* Y軸 scale toggle */
+  .scale-toggle {
+    display: inline-flex;
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 2px;
+    border: 1px solid var(--border);
+  }
+  .scale-toggle button {
+    background: transparent;
+    border: none;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--text-light);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .scale-toggle button:hover { color: var(--primary); }
+  .scale-toggle button.active {
+    background: var(--primary);
+    color: white;
+    font-weight: 500;
+  }
 </style>
 </head>
 <body>
@@ -416,7 +441,13 @@
       </div>
 
       <div class="card">
-        <h2>📈 每年醫療保費（隨年齡上升）</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="margin-bottom: 0;">📈 每年醫療保費（隨年齡上升）</h2>
+          <div class="scale-toggle" id="yearlyScaleToggle" data-mode="log">
+            <button type="button" data-scale="linear">線性</button>
+            <button type="button" data-scale="log" class="active">對數</button>
+          </div>
+        </div>
         <div class="chart-container">
           <canvas id="chartYearly"></canvas>
         </div>
@@ -575,6 +606,7 @@ function updateVariantDropdown() {
 // ============================================================
 let chartYearly = null;
 let chartCumulative = null;
+let yearlyScaleMode = 'log';  // 'log' | 'linear'
 
 function renderCharts(sim) {
   const labels = sim.results.map(r => r.age);
@@ -623,8 +655,11 @@ function renderCharts(sim) {
       scales: {
         x: { title: { display: true, text: '年齡' }, ticks: { maxTicksLimit: 12 } },
         y: {
+          type: yearlyScaleMode === 'log' ? 'logarithmic' : 'linear',
           title: { display: true, text: 'HKD（年保費）' },
-          ticks: { callback: (v) => fmtMoney(v) },
+          ticks: {
+            callback: (v) => fmtMoney(v),
+          },
         },
       },
     },
@@ -846,6 +881,19 @@ function bindEvents() {
 
   document.querySelectorAll('input[name="gender"]').forEach(r => {
     r.addEventListener('change', runSimulation);
+  });
+
+  // Y軸 scale toggle
+  document.querySelectorAll('#yearlyScaleToggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.scale;
+      if (mode === yearlyScaleMode) return;
+      yearlyScaleMode = mode;
+      document.querySelectorAll('#yearlyScaleToggle button').forEach(b => {
+        b.classList.toggle('active', b.dataset.scale === mode);
+      });
+      runSimulation();
+    });
   });
 }
 
