@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>醫療通脹計算器</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #0F4C81;
+    --primary-light: #2D6FA8;
+    --accent: #C9A961;
+    --danger: #D84315;
+    --bg: #F5F7FA;
+    --card-bg: #FFFFFF;
+    --text: #1F2937;
+    --text-light: #6B7280;
+    --border: #E5E7EB;
+    --premium-line: #D84315;
+    --baseline-line: #9CA3AF;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang HK", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 24px;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; }
+
+  header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--primary);
+  }
+  header h1 {
+    font-size: 28px;
+    color: var(--primary);
+    font-weight: 700;
+  }
+  header .subtitle {
+    color: var(--text-light);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 1024px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.04);
+  }
+
+  .card h2 {
+    font-size: 16px;
+    margin-bottom: 16px;
+    color: var(--primary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .form-group .helper {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 4px;
+  }
+  .form-group input[type="number"],
+  .form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+  }
+  .form-group input[type="number"]:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+
+  .radio-group {
+    display: flex;
+    gap: 8px;
+  }
+  .radio-group label {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-align: center;
+    cursor: pointer;
+    margin: 0;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .radio-group input[type="radio"] { display: none; }
+  .radio-group label:has(input:checked) {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+  }
+
+  .slider-group input[type="range"] {
+    width: 100%;
+    accent-color: var(--primary);
+  }
+  .slider-value {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 13px;
+    margin-left: 8px;
+  }
+
+  .results-section { display: flex; flex-direction: column; gap: 20px; }
+
+  .hero-card {
+    background: linear-gradient(135deg, var(--danger) 0%, #E64A19 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: 0 4px 12px rgba(216, 67, 21, 0.25);
+    text-align: center;
+  }
+  .hero-card .hero-label {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+  }
+  .hero-card .hero-amount {
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+  .hero-card .hero-detail {
+    font-size: 14px;
+    opacity: 0.95;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: 1fr; }
+  }
+  .stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid var(--border);
+  }
+  .stat-card .stat-label {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 4px;
+  }
+  .stat-card .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+  .stat-card .stat-unit {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-left: 2px;
+  }
+  .stat-card .stat-detail {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 4px;
+  }
+  .stat-card.inflation .stat-value { color: var(--danger); }
+  .stat-card.first-year .stat-value { color: var(--text); }
+  .stat-card.last-year .stat-value { color: var(--danger); }
+
+  .chart-container {
+    position: relative;
+    height: 320px;
+    margin-top: 12px;
+  }
+
+  footer {
+    margin-top: 32px;
+    padding: 16px;
+    background: #FFF8E1;
+    border-radius: 8px;
+    border: 1px solid #FFD54F;
+    font-size: 12px;
+    color: #5D4037;
+  }
+  footer strong { color: #BF360C; }
+
+  /* 明細表 */
+  .detail-toggle {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.15s;
+  }
+  .detail-toggle:hover { background: #F9FAFB; }
+  .detail-toggle .arrow { transition: transform 0.2s; }
+  .detail-toggle.open .arrow { transform: rotate(180deg); }
+  .detail-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: white;
+    border-radius: 0 0 8px 8px;
+  }
+  .detail-panel.open { max-height: 600px; }
+  .detail-panel-inner {
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+  }
+  .detail-search {
+    margin-bottom: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .detail-search input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .detail-search button {
+    padding: 6px 12px;
+    border: 1px solid var(--primary);
+    background: var(--primary);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .detail-search button:hover { background: var(--primary-light); }
+  .detail-table-wrap {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  table.detail-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    padding: 8px 12px;
+    text-align: right;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  table.detail-table thead th:first-child { text-align: left; }
+  table.detail-table tbody td {
+    padding: 6px 12px;
+    text-align: right;
+    border-bottom: 1px solid #F3F4F6;
+  }
+  table.detail-table tbody td:first-child {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-light);
+  }
+  table.detail-table tbody td.copyable {
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  table.detail-table tbody td.copyable:hover {
+    background: #FEF3C7;
+  }
+  table.detail-table tbody td.copied {
+    background: #D1FAE5 !important;
+    color: var(--success);
+    font-weight: 600;
+  }
+  table.detail-table tbody tr.highlight td {
+    background: #FEF3C7 !important;
+  }
+  .copy-hint {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-bottom: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>醫療通脹計算器</h1>
+    <p class="subtitle">睇清楚客戶終身醫療開支 — 通脹複利下嘅真實數字</p>
+  </header>
+
+  <div class="layout">
+    <!-- LEFT: Inputs -->
+    <aside class="card">
+      <h2>📋 客戶資料</h2>
+
+      <div class="form-group">
+        <label>客戶現年齡</label>
+        <input type="number" id="currentAge" value="30" min="18" max="80">
+      </div>
+
+      <div class="form-group">
+        <label>目標年齡（推算至）</label>
+        <input type="number" id="targetAge" value="100" min="40" max="120">
+      </div>
+
+      <div class="form-group">
+        <label>性別 <span id="genderNote" style="display:none; color: var(--text-light); font-weight: normal; font-size: 11px;">（此 Plan 男女保費相同）</span></label>
+        <div class="radio-group">
+          <label>
+            <input type="radio" name="gender" value="male" checked>
+            <span>男</span>
+          </label>
+          <label>
+            <input type="radio" name="gender" value="female">
+            <span>女</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>醫療 Plan（保險公司）</label>
+        <select id="medicalPlan"></select>
+      </div>
+
+      <div class="form-group">
+        <label>房型 + 保障級別</label>
+        <select id="medicalVariant"></select>
+        <div class="helper" id="variantHelper"></div>
+      </div>
+
+      <div class="form-group slider-group">
+        <label>醫療通脹率 <span class="slider-value" id="inflationDisplay">5.0%</span></label>
+        <input type="range" id="inflation" min="0" max="12" step="0.5" value="5">
+        <div class="helper">保險公司每年重新定價嘅幅度（疊加喺年齡保費表上）</div>
+      </div>
+    </aside>
+
+    <!-- RIGHT: Results -->
+    <section class="results-section">
+      <div class="hero-card">
+        <div class="hero-label">客戶終身醫療總開支</div>
+        <div class="hero-amount" id="heroAmount">—</div>
+        <div class="hero-detail" id="heroDetail">—</div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card first-year">
+          <div class="stat-label">首年保費</div>
+          <div class="stat-value" id="statFirstYear">—</div>
+          <div class="stat-detail" id="statFirstYearDetail">—</div>
+        </div>
+        <div class="stat-card last-year">
+          <div class="stat-label">最後一年保費</div>
+          <div class="stat-value" id="statLastYear">—</div>
+          <div class="stat-detail" id="statLastYearDetail">—</div>
+        </div>
+        <div class="stat-card inflation">
+          <div class="stat-label">通脹額外開支</div>
+          <div class="stat-value" id="statInflationDelta">—</div>
+          <div class="stat-detail">vs 保費表凍結（只計年齡進階）</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📈 每年醫療保費（隨年齡上升）</h2>
+        <div class="chart-container">
+          <canvas id="chartYearly"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>💰 累計醫療開支：有通脹 vs 保費表凍結</h2>
+        <div class="chart-container">
+          <canvas id="chartCumulative"></canvas>
+        </div>
+      </div>
+
+      <button type="button" class="detail-toggle" id="detailToggle">
+        <span>📋 每年保費明細表 <span style="color: var(--text-light); font-weight: normal; font-size: 12px;">（click 任何金額 → 自動 copy）</span></span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="detail-panel" id="detailPanel">
+        <div class="detail-panel-inner">
+          <div class="detail-search">
+            <input type="number" id="detailSearchAge" placeholder="跳到年齡（例如 55）" min="0" max="120">
+            <button type="button" id="detailSearchBtn">跳轉</button>
+            <button type="button" id="detailCopyAll" style="background: var(--accent); border-color: var(--accent);">Copy 全表</button>
+          </div>
+          <div class="copy-hint">💡 Click 任何「保費」或「累計」金額 → 自動 copy 數字到剪貼簿</div>
+          <div class="detail-table-wrap">
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>年齡</th>
+                  <th>第 N 年</th>
+                  <th>當年保費（含通脹）</th>
+                  <th>當年保費（凍結）</th>
+                  <th>累計</th>
+                </tr>
+              </thead>
+              <tbody id="detailTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <strong>⚠️ 免責聲明：</strong>
+    本工具以醫療 plan 當前保費為基礎，按設定通脹率複合計算未來保費，僅作為客戶醫療開支推算之用。
+    實際保費以保險公司年度公布為準。示範數據用於 UI demo，需替換為真實 plan 數據。
+  </footer>
+</div>
+
+<script src="data/medical-plans.js"></script>
+
+<script>
+// ============================================================
+// 核心計算：醫療保費通脹複利
+// ============================================================
+function simulate({
+  currentAge,
+  targetAge,
+  gender,
+  medicalPlanId,
+  medicalVariantId,
+  inflationRate,
+}) {
+  const yearsToSimulate = Math.max(1, targetAge - currentAge + 1);
+
+  const results = [];
+  let totalWithInflation = 0;
+  let totalWithoutInflation = 0;
+
+  // 用實際年齡保費表 + 通脹複利:
+  // 該年齡實際保費 = 保費表[該年齡] × (1 + 通脹率)^年數
+  for (let i = 0; i < yearsToSimulate; i++) {
+    const age = currentAge + i;
+    const ageBasePremium = getMedicalBasePremium(medicalPlanId, medicalVariantId, gender, age);
+    const premium = ageBasePremium * Math.pow(1 + inflationRate, i);
+    const premiumNoInflation = ageBasePremium;
+
+    totalWithInflation += premium;
+    totalWithoutInflation += premiumNoInflation;
+
+    results.push({
+      age,
+      premium: Math.round(premium),
+      premiumNoInflation: Math.round(premiumNoInflation),
+      cumulative: Math.round(totalWithInflation),
+      cumulativeNoInflation: Math.round(totalWithoutInflation),
+    });
+  }
+
+  return {
+    results,
+    totalWithInflation: Math.round(totalWithInflation),
+    totalWithoutInflation: Math.round(totalWithoutInflation),
+    inflationDelta: Math.round(totalWithInflation - totalWithoutInflation),
+    firstYearPremium: results[0].premium,
+    lastYearPremium: results[results.length - 1].premium,
+    yearsCovered: yearsToSimulate,
+  };
+}
+
+// ============================================================
+// 格式化 helpers
+// ============================================================
+function fmtMoney(n) {
+  if (n >= 1e8) return (n / 1e8).toFixed(2) + ' 億';
+  if (n >= 1e4) return (n / 1e4).toFixed(1) + ' 萬';
+  return n.toLocaleString();
+}
+function fmtMoneyFull(n) {
+  return 'HK$ ' + Math.round(n).toLocaleString();
+}
+
+// ============================================================
+// UI 初始化
+// ============================================================
+function populatePlanDropdown() {
+  const sel = document.getElementById('medicalPlan');
+  sel.innerHTML = '';
+  Object.values(MEDICAL_PLANS).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.sourceLabel || p.productName;
+    sel.appendChild(opt);
+  });
+  updateVariantDropdown();
+}
+
+function updateVariantDropdown() {
+  const planId = document.getElementById('medicalPlan').value;
+  const plan = MEDICAL_PLANS[planId];
+  const sel = document.getElementById('medicalVariant');
+  sel.innerHTML = '';
+  if (!plan || !plan.variants) return;
+  plan.variants.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = v.label;
+    sel.appendChild(opt);
+  });
+  // helper text
+  const helper = document.getElementById('variantHelper');
+  if (helper) {
+    helper.textContent = plan.note || '';
+  }
+  // gender-neutral indicator
+  const genderNote = document.getElementById('genderNote');
+  if (genderNote) {
+    const isGenderNeutral = plan.variants[0] && plan.variants[0].genderNeutral;
+    genderNote.style.display = isGenderNeutral ? 'inline' : 'none';
+  }
+}
+
+// ============================================================
+// 圖表
+// ============================================================
+let chartYearly = null;
+let chartCumulative = null;
+
+function renderCharts(sim) {
+  const labels = sim.results.map(r => r.age);
+  const yearlyPremium = sim.results.map(r => r.premium);
+  const yearlyNoInflation = sim.results.map(r => r.premiumNoInflation);
+  const cumulative = sim.results.map(r => r.cumulative);
+  const cumulativeNoInflation = sim.results.map(r => r.cumulativeNoInflation);
+
+  // Chart 1: 每年保費
+  if (chartYearly) chartYearly.destroy();
+  chartYearly = new Chart(document.getElementById('chartYearly'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '當年保費（含通脹）',
+          data: yearlyPremium,
+          borderColor: '#D84315',
+          backgroundColor: 'rgba(216, 67, 21, 0.15)',
+          tension: 0.2, fill: true, pointRadius: 0, borderWidth: 2.5,
+        },
+        {
+          label: '若保費表凍結（只年齡進階）',
+          data: yearlyNoInflation,
+          borderColor: '#9CA3AF',
+          backgroundColor: 'rgba(156, 163, 175, 0)',
+          tension: 0, fill: false, pointRadius: 0, borderWidth: 1.5,
+          borderDash: [4, 4],
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end' },
+        tooltip: {
+          callbacks: {
+            title: (items) => `${items[0].label} 歲`,
+            label: (ctx) => `${ctx.dataset.label}: ${fmtMoneyFull(ctx.parsed.y)}`,
+          },
+        },
+      },
+      scales: {
+        x: { title: { display: true, text: '年齡' }, ticks: { maxTicksLimit: 12 } },
+        y: {
+          title: { display: true, text: 'HKD（年保費）' },
+          ticks: { callback: (v) => fmtMoney(v) },
+        },
+      },
+    },
+  });
+
+  // Chart 2: 累計
+  if (chartCumulative) chartCumulative.destroy();
+  chartCumulative = new Chart(document.getElementById('chartCumulative'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '累計（含通脹）',
+          data: cumulative,
+          borderColor: '#D84315',
+          backgroundColor: 'rgba(216, 67, 21, 0.2)',
+          tension: 0.2, fill: true, pointRadius: 0, borderWidth: 2.5,
+        },
+        {
+          label: '累計（保費表凍結）',
+          data: cumulativeNoInflation,
+          borderColor: '#6B7280',
+          backgroundColor: 'rgba(107, 114, 128, 0.15)',
+          tension: 0.2, fill: true, pointRadius: 0, borderWidth: 2,
+          borderDash: [6, 4],
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end' },
+        tooltip: {
+          callbacks: {
+            title: (items) => `${items[0].label} 歲`,
+            label: (ctx) => `${ctx.dataset.label}: ${fmtMoneyFull(ctx.parsed.y)}`,
+          },
+        },
+      },
+      scales: {
+        x: { title: { display: true, text: '年齡' }, ticks: { maxTicksLimit: 12 } },
+        y: {
+          title: { display: true, text: 'HKD（累計）' },
+          ticks: { callback: (v) => fmtMoney(v) },
+        },
+      },
+    },
+  });
+}
+
+// ============================================================
+// 結果顯示
+// ============================================================
+function renderResults(sim, input) {
+  document.getElementById('heroAmount').textContent =
+    'HK$ ' + fmtMoney(sim.totalWithInflation);
+  document.getElementById('heroDetail').textContent =
+    `${input.currentAge} 歲 → ${input.targetAge} 歲，共 ${sim.yearsCovered} 年累計醫療保費`;
+
+  document.getElementById('statFirstYear').textContent =
+    fmtMoneyFull(sim.firstYearPremium);
+  document.getElementById('statFirstYearDetail').textContent =
+    `客戶 ${input.currentAge} 歲嘅當年保費`;
+
+  document.getElementById('statLastYear').textContent =
+    fmtMoneyFull(sim.lastYearPremium);
+  const multiplier = (sim.lastYearPremium / sim.firstYearPremium).toFixed(1);
+  document.getElementById('statLastYearDetail').textContent =
+    `${input.targetAge} 歲，比首年貴 ${multiplier} 倍`;
+
+  document.getElementById('statInflationDelta').textContent =
+    'HK$ ' + fmtMoney(sim.inflationDelta);
+}
+
+// ============================================================
+// 明細表
+// ============================================================
+let lastSim = null;
+let lastInput = null;
+
+function renderDetailTable(sim, input) {
+  lastSim = sim;
+  lastInput = input;
+
+  const tbody = document.getElementById('detailTableBody');
+  tbody.innerHTML = '';
+
+  let cum = 0;
+  sim.results.forEach((r, idx) => {
+    cum += r.premium;
+    const tr = document.createElement('tr');
+    tr.dataset.age = r.age;
+    tr.innerHTML = `
+      <td>${r.age} 歲</td>
+      <td>第 ${idx + 1} 年</td>
+      <td class="copyable" data-copy="${r.premium}">HK$ ${r.premium.toLocaleString()}</td>
+      <td class="copyable" data-copy="${r.premiumNoInflation}">HK$ ${r.premiumNoInflation.toLocaleString()}</td>
+      <td class="copyable" data-copy="${cum}">HK$ ${Math.round(cum).toLocaleString()}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // bind copy handlers
+  tbody.querySelectorAll('td.copyable').forEach(td => {
+    td.addEventListener('click', async () => {
+      const value = td.dataset.copy;
+      try {
+        await navigator.clipboard.writeText(value);
+        td.classList.add('copied');
+        const orig = td.textContent;
+        td.textContent = '✓ Copied: ' + value;
+        setTimeout(() => {
+          td.classList.remove('copied');
+          td.textContent = orig;
+        }, 1000);
+      } catch (e) {
+        // fallback for non-clipboard contexts
+        const range = document.createRange();
+        range.selectNode(td);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.execCommand('copy');
+        td.classList.add('copied');
+        setTimeout(() => td.classList.remove('copied'), 1000);
+      }
+    });
+  });
+}
+
+function bindDetailEvents() {
+  const toggle = document.getElementById('detailToggle');
+  const panel = document.getElementById('detailPanel');
+  toggle.addEventListener('click', () => {
+    toggle.classList.toggle('open');
+    panel.classList.toggle('open');
+  });
+
+  document.getElementById('detailSearchBtn').addEventListener('click', () => {
+    const targetAge = parseInt(document.getElementById('detailSearchAge').value);
+    if (isNaN(targetAge)) return;
+    const tbody = document.getElementById('detailTableBody');
+    tbody.querySelectorAll('tr').forEach(tr => tr.classList.remove('highlight'));
+    const row = tbody.querySelector(`tr[data-age="${targetAge}"]`);
+    if (row) {
+      row.classList.add('highlight');
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  document.getElementById('detailSearchAge').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('detailSearchBtn').click();
+  });
+
+  document.getElementById('detailCopyAll').addEventListener('click', async () => {
+    if (!lastSim) return;
+    const lines = ['年齡\t第N年\t當年保費(含通脹)\t當年保費(凍結)\t累計'];
+    let cum = 0;
+    lastSim.results.forEach((r, idx) => {
+      cum += r.premium;
+      lines.push(`${r.age}\t${idx + 1}\t${r.premium}\t${r.premiumNoInflation}\t${Math.round(cum)}`);
+    });
+    const text = lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('detailCopyAll');
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied 全表';
+      setTimeout(() => btn.textContent = orig, 1500);
+    } catch (e) {
+      alert('Copy 失敗，可以手動 select 個 table');
+    }
+  });
+}
+
+// ============================================================
+// 主流程
+// ============================================================
+function runSimulation() {
+  const input = {
+    currentAge: parseInt(document.getElementById('currentAge').value),
+    targetAge: parseInt(document.getElementById('targetAge').value),
+    gender: document.querySelector('input[name="gender"]:checked').value,
+    medicalPlanId: document.getElementById('medicalPlan').value,
+    medicalVariantId: document.getElementById('medicalVariant').value,
+    inflationRate: parseFloat(document.getElementById('inflation').value) / 100,
+  };
+
+  if (input.targetAge <= input.currentAge) return;
+  if (!input.medicalVariantId) return;
+
+  const sim = simulate(input);
+  renderResults(sim, input);
+  renderCharts(sim);
+  renderDetailTable(sim, input);
+}
+
+// ============================================================
+// Event bindings
+// ============================================================
+function bindEvents() {
+  ['currentAge', 'targetAge', 'inflation', 'medicalVariant'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      if (id === 'inflation') {
+        document.getElementById('inflationDisplay').textContent =
+          parseFloat(document.getElementById('inflation').value).toFixed(1) + '%';
+      }
+      runSimulation();
+    });
+  });
+
+  // Plan change → repopulate variants → re-run
+  document.getElementById('medicalPlan').addEventListener('change', () => {
+    updateVariantDropdown();
+    runSimulation();
+  });
+
+  document.querySelectorAll('input[name="gender"]').forEach(r => {
+    r.addEventListener('change', runSimulation);
+  });
+}
+
+// ============================================================
+// 啟動
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  populatePlanDropdown();
+  bindEvents();
+  bindDetailEvents();
+  runSimulation();
+});
+</script>
+</body>
+</html>
