@@ -407,6 +407,16 @@
         <div class="helper" id="variantHelper"></div>
       </div>
 
+      <div class="form-group">
+        <label>附加保障 <span style="color: var(--text-light); font-weight: normal; font-size: 11px;">（選用）</span></label>
+        <select id="addonPlan"></select>
+      </div>
+
+      <div class="form-group" id="addonVariantGroup" style="display: none;">
+        <label>附加保障 — 房型 / 級別</label>
+        <select id="addonVariant"></select>
+      </div>
+
       <div class="form-group slider-group">
         <label>醫療通脹率 <span class="slider-value" id="inflationDisplay">5.0%</span></label>
         <input type="range" id="inflation" min="0" max="12" step="0.5" value="5">
@@ -510,40 +520,62 @@ function simulate({
   gender,
   medicalPlanId,
   medicalVariantId,
+  addonPlanId,
+  addonVariantId,
   inflationRate,
 }) {
   const yearsToSimulate = Math.max(1, targetAge - currentAge + 1);
+  const hasAddon = !!(addonPlanId && addonVariantId);
 
   const results = [];
   let totalWithInflation = 0;
   let totalWithoutInflation = 0;
+  let totalBase = 0;
+  let totalAddon = 0;
 
-  // 用實際年齡保費表 + 通脹複利:
   // 該年齡實際保費 = 保費表[該年齡] × (1 + 通脹率)^年數
+  // 若有附加保障：base + addon 兩者各自查表 + 通脹複利再相加
   for (let i = 0; i < yearsToSimulate; i++) {
     const age = currentAge + i;
-    const ageBasePremium = getMedicalBasePremium(medicalPlanId, medicalVariantId, gender, age);
-    const premium = ageBasePremium * Math.pow(1 + inflationRate, i);
-    const premiumNoInflation = ageBasePremium;
+    const baseAgePremium = getMedicalBasePremium(medicalPlanId, medicalVariantId, gender, age);
+    const addonAgePremium = hasAddon
+      ? getMedicalBasePremium(addonPlanId, addonVariantId, gender, age)
+      : 0;
+    const inflFactor = Math.pow(1 + inflationRate, i);
+    const basePremium = baseAgePremium * inflFactor;
+    const addonPremium = addonAgePremium * inflFactor;
+    const premium = basePremium + addonPremium;
+    const premiumNoInflation = baseAgePremium + addonAgePremium;
 
     totalWithInflation += premium;
     totalWithoutInflation += premiumNoInflation;
+    totalBase += basePremium;
+    totalAddon += addonPremium;
 
     results.push({
       age,
       premium: Math.round(premium),
+      basePremium: Math.round(basePremium),
+      addonPremium: Math.round(addonPremium),
       premiumNoInflation: Math.round(premiumNoInflation),
       cumulative: Math.round(totalWithInflation),
+      cumulativeBase: Math.round(totalBase),
+      cumulativeAddon: Math.round(totalAddon),
       cumulativeNoInflation: Math.round(totalWithoutInflation),
     });
   }
 
   return {
     results,
+    hasAddon,
     totalWithInflation: Math.round(totalWithInflation),
     totalWithoutInflation: Math.round(totalWithoutInflation),
+    totalBase: Math.round(totalBase),
+    totalAddon: Math.round(totalAddon),
     inflationDelta: Math.round(totalWithInflation - totalWithoutInflation),
     firstYearPremium: results[0].premium,
+    firstYearBase: results[0].basePremium,
+    firstYearAddon: results[0].addonPremium,
     lastYearPremium: results[results.length - 1].premium,
     yearsCovered: yearsToSimulate,
   };
@@ -564,6 +596,10 @@ function fmtMoneyFull(n) {
 // ============================================================
 // UI 初始化
 // ============================================================
+function isAddonPlan(plan) {
+  return (plan.productName || '').includes('附加保障');
+}
+
 function populatePlanDropdown() {
   const sel = document.getElementById('medicalPlan');
   sel.innerHTML = '';
@@ -573,7 +609,36 @@ function populatePlanDropdown() {
     opt.textContent = p.sourceLabel || p.productName;
     sel.appendChild(opt);
   });
+
+  const addonSel = document.getElementById('addonPlan');
+  addonSel.innerHTML = '';
+  const noneOpt = document.createElement('option');
+  noneOpt.value = '';
+  noneOpt.textContent = '無';
+  addonSel.appendChild(noneOpt);
+  Object.values(MEDICAL_PLANS).filter(p => isAddonPlan(p)).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.sourceLabel || p.productName;
+    addonSel.appendChild(opt);
+  });
+
   updateVariantDropdown();
+  updateAddonSection();
+}
+
+function updateAddonSection() {
+  // 主 plan 本身已經係附加保障 → hide 整個附加 dropdown 區
+  const mainPlanId = document.getElementById('medicalPlan').value;
+  const mainIsAddon = mainPlanId && isAddonPlan(MEDICAL_PLANS[mainPlanId]);
+  const addonPlanGroup = document.getElementById('addonPlan').closest('.form-group');
+  if (mainIsAddon) {
+    addonPlanGroup.style.display = 'none';
+    document.getElementById('addonPlan').value = '';
+  } else {
+    addonPlanGroup.style.display = '';
+  }
+  updateAddonVariantDropdown();
 }
 
 function updateVariantDropdown() {
@@ -601,6 +666,29 @@ function updateVariantDropdown() {
   }
 }
 
+function updateAddonVariantDropdown() {
+  const planId = document.getElementById('addonPlan').value;
+  const sel = document.getElementById('addonVariant');
+  const group = document.getElementById('addonVariantGroup');
+  sel.innerHTML = '';
+  if (!planId) {
+    group.style.display = 'none';
+    return;
+  }
+  const plan = MEDICAL_PLANS[planId];
+  if (!plan || !plan.variants) {
+    group.style.display = 'none';
+    return;
+  }
+  plan.variants.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = v.label;
+    sel.appendChild(opt);
+  });
+  group.style.display = '';
+}
+
 // ============================================================
 // 圖表
 // ============================================================
@@ -611,17 +699,44 @@ let yearlyScaleMode = 'log';  // 'log' | 'linear'
 function renderCharts(sim) {
   const labels = sim.results.map(r => r.age);
   const yearlyPremium = sim.results.map(r => r.premium);
+  const yearlyBase = sim.results.map(r => r.basePremium);
+  const yearlyAddon = sim.results.map(r => r.addonPremium);
   const yearlyNoInflation = sim.results.map(r => r.premiumNoInflation);
   const cumulative = sim.results.map(r => r.cumulative);
+  const cumulativeBase = sim.results.map(r => r.cumulativeBase);
+  const cumulativeAddon = sim.results.map(r => r.cumulativeAddon);
   const cumulativeNoInflation = sim.results.map(r => r.cumulativeNoInflation);
 
   // Chart 1: 每年保費
   if (chartYearly) chartYearly.destroy();
-  chartYearly = new Chart(document.getElementById('chartYearly'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
+  const yearlyDatasets = sim.hasAddon
+    ? [
+        {
+          label: '基礎計劃',
+          data: yearlyBase,
+          borderColor: '#D84315',
+          backgroundColor: 'rgba(216, 67, 21, 0.55)',
+          tension: 0.2, fill: true, pointRadius: 0, borderWidth: 1.5,
+          stack: 'inflation',
+        },
+        {
+          label: '附加保障',
+          data: yearlyAddon,
+          borderColor: '#F59E0B',
+          backgroundColor: 'rgba(245, 158, 11, 0.55)',
+          tension: 0.2, fill: true, pointRadius: 0, borderWidth: 1.5,
+          stack: 'inflation',
+        },
+        {
+          label: '若保費表凍結（只年齡進階）',
+          data: yearlyNoInflation,
+          borderColor: '#6B7280',
+          backgroundColor: 'rgba(0,0,0,0)',
+          tension: 0, fill: false, pointRadius: 0, borderWidth: 1.5,
+          borderDash: [4, 4],
+        },
+      ]
+    : [
         {
           label: '當年保費（含通脹）',
           data: yearlyPremium,
@@ -637,8 +752,10 @@ function renderCharts(sim) {
           tension: 0, fill: false, pointRadius: 0, borderWidth: 1.5,
           borderDash: [4, 4],
         },
-      ],
-    },
+      ];
+  chartYearly = new Chart(document.getElementById('chartYearly'), {
+    type: 'line',
+    data: { labels, datasets: yearlyDatasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -649,6 +766,12 @@ function renderCharts(sim) {
           callbacks: {
             title: (items) => `${items[0].label} 歲`,
             label: (ctx) => `${ctx.dataset.label}: ${fmtMoneyFull(ctx.parsed.y)}`,
+            footer: sim.hasAddon ? (items) => {
+              const stackItems = items.filter(it => it.dataset.stack === 'inflation');
+              if (stackItems.length < 2) return '';
+              const total = stackItems.reduce((s, it) => s + it.parsed.y, 0);
+              return '合計：' + fmtMoneyFull(total);
+            } : undefined,
           },
         },
       },
@@ -656,6 +779,7 @@ function renderCharts(sim) {
         x: { title: { display: true, text: '年齡' }, ticks: { maxTicksLimit: 12 } },
         y: {
           type: yearlyScaleMode === 'log' ? 'logarithmic' : 'linear',
+          stacked: sim.hasAddon && yearlyScaleMode === 'linear',
           title: { display: true, text: 'HKD（年保費）' },
           ticks: {
             callback: (v) => fmtMoney(v),
@@ -667,11 +791,34 @@ function renderCharts(sim) {
 
   // Chart 2: 累計
   if (chartCumulative) chartCumulative.destroy();
-  chartCumulative = new Chart(document.getElementById('chartCumulative'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
+  const cumulativeDatasets = sim.hasAddon
+    ? [
+        {
+          label: '基礎計劃累計',
+          data: cumulativeBase,
+          borderColor: '#D84315',
+          backgroundColor: 'rgba(216, 67, 21, 0.55)',
+          tension: 0.2, fill: true, pointRadius: 0, borderWidth: 1.5,
+          stack: 'cumInflation',
+        },
+        {
+          label: '附加保障累計',
+          data: cumulativeAddon,
+          borderColor: '#F59E0B',
+          backgroundColor: 'rgba(245, 158, 11, 0.55)',
+          tension: 0.2, fill: true, pointRadius: 0, borderWidth: 1.5,
+          stack: 'cumInflation',
+        },
+        {
+          label: '累計（保費表凍結）',
+          data: cumulativeNoInflation,
+          borderColor: '#6B7280',
+          backgroundColor: 'rgba(0,0,0,0)',
+          tension: 0.2, fill: false, pointRadius: 0, borderWidth: 2,
+          borderDash: [6, 4],
+        },
+      ]
+    : [
         {
           label: '累計（含通脹）',
           data: cumulative,
@@ -687,8 +834,10 @@ function renderCharts(sim) {
           tension: 0.2, fill: true, pointRadius: 0, borderWidth: 2,
           borderDash: [6, 4],
         },
-      ],
-    },
+      ];
+  chartCumulative = new Chart(document.getElementById('chartCumulative'), {
+    type: 'line',
+    data: { labels, datasets: cumulativeDatasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -699,12 +848,19 @@ function renderCharts(sim) {
           callbacks: {
             title: (items) => `${items[0].label} 歲`,
             label: (ctx) => `${ctx.dataset.label}: ${fmtMoneyFull(ctx.parsed.y)}`,
+            footer: sim.hasAddon ? (items) => {
+              const stackItems = items.filter(it => it.dataset.stack === 'cumInflation');
+              if (stackItems.length < 2) return '';
+              const total = stackItems.reduce((s, it) => s + it.parsed.y, 0);
+              return '合計：' + fmtMoneyFull(total);
+            } : undefined,
           },
         },
       },
       scales: {
         x: { title: { display: true, text: '年齡' }, ticks: { maxTicksLimit: 12 } },
         y: {
+          stacked: sim.hasAddon,
           title: { display: true, text: 'HKD（累計）' },
           ticks: { callback: (v) => fmtMoney(v) },
         },
@@ -719,13 +875,16 @@ function renderCharts(sim) {
 function renderResults(sim, input) {
   document.getElementById('heroAmount').textContent =
     'HK$ ' + fmtMoney(sim.totalWithInflation);
-  document.getElementById('heroDetail').textContent =
-    `${input.currentAge} 歲 → ${input.targetAge} 歲，共 ${sim.yearsCovered} 年累計醫療保費`;
+  const heroDetailBase = `${input.currentAge} 歲 → ${input.targetAge} 歲，共 ${sim.yearsCovered} 年累計醫療保費`;
+  document.getElementById('heroDetail').textContent = sim.hasAddon
+    ? `${heroDetailBase}（基礎 HK$ ${fmtMoney(sim.totalBase)} + 附加 HK$ ${fmtMoney(sim.totalAddon)}）`
+    : heroDetailBase;
 
   document.getElementById('statFirstYear').textContent =
     fmtMoneyFull(sim.firstYearPremium);
-  document.getElementById('statFirstYearDetail').textContent =
-    `客戶 ${input.currentAge} 歲嘅當年保費`;
+  document.getElementById('statFirstYearDetail').textContent = sim.hasAddon
+    ? `${input.currentAge} 歲：基礎 ${fmtMoneyFull(sim.firstYearBase)} + 附加 ${fmtMoneyFull(sim.firstYearAddon)}`
+    : `客戶 ${input.currentAge} 歲嘅當年保費`;
 
   document.getElementById('statLastYear').textContent =
     fmtMoneyFull(sim.lastYearPremium);
@@ -847,6 +1006,8 @@ function runSimulation() {
     gender: document.querySelector('input[name="gender"]:checked').value,
     medicalPlanId: document.getElementById('medicalPlan').value,
     medicalVariantId: document.getElementById('medicalVariant').value,
+    addonPlanId: document.getElementById('addonPlan').value,
+    addonVariantId: document.getElementById('addonVariant').value,
     inflationRate: parseFloat(document.getElementById('inflation').value) / 100,
   };
 
@@ -863,7 +1024,7 @@ function runSimulation() {
 // Event bindings
 // ============================================================
 function bindEvents() {
-  ['currentAge', 'targetAge', 'inflation', 'medicalVariant'].forEach(id => {
+  ['currentAge', 'targetAge', 'inflation', 'medicalVariant', 'addonVariant'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
       if (id === 'inflation') {
         document.getElementById('inflationDisplay').textContent =
@@ -876,6 +1037,12 @@ function bindEvents() {
   // Plan change → repopulate variants → re-run
   document.getElementById('medicalPlan').addEventListener('change', () => {
     updateVariantDropdown();
+    updateAddonSection();
+    runSimulation();
+  });
+
+  document.getElementById('addonPlan').addEventListener('change', () => {
+    updateAddonVariantDropdown();
     runSimulation();
   });
 
